@@ -1,0 +1,12 @@
+import mysql.connector
+
+class Db:
+   @staticmethod
+   def connect():
+       mydb = mysql.connector.connect(
+           host="192.168.2.200",
+           user= "sattin_leonardo",
+           password= "wastrels.inducts.manse.",
+           database="sattin_leonardo_ecommerce"
+       )
+       return mydb
