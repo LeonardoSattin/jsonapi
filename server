@@ -1,0 +1,118 @@
+import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from product import Product
+
+
+# Classe per la gestione delle requests
+class RequestHandler(BaseHTTPRequestHandler):
+   # GET
+   def do_GET(self):
+       # GET di tutti prodotti
+       if self.path == '/products':
+           products = Product.fetch_all()
+         
+           data = [{"type": "products", "id": str(product[0]), "attributes": {"nome": product[1], "prezzo": product[2], "marca": str(product[3])}} for product in products]
+           self.send_response(200)
+           self.send_header('Content-type', 'application/vnd.api+json')
+           self.send_header('Location', f'http://{self.server.server_address[0]}:{self.server.server_address[1]}/products')
+           self.send_header('Access-Control-Allow-Origin', '*')
+           self.end_headers()
+           self.wfile.write(json.dumps({"data": data}).encode())
+       # GET di un singolo prodotto
+       elif self.path.startswith('/products/'):
+           product_id = self.path.split('/')[-1]
+           product = Product.find(product_id)
+           # Se si trova il prodotto
+           if product:
+               data = {"type": "products", "id": str(product[0]), "attributes": {"nome": product[1], "prezzo": product[2], "marca": str(product[3])}}
+               self.send_response(200)
+               self.send_header('Content-type', 'application/vnd.api+json')
+               self.send_header('Location', f'http://{self.server.server_address[0]}:{self.server.server_address[1]}/products/{product[0]}')
+               self.end_headers()
+               self.wfile.write(json.dumps({"data": data}).encode())
+           # Altrimenti
+           else:
+               self.send_response(404)
+               self.end_headers()
+               self.wfile.write(json.dumps({"message": "Prodotto non trovato"}).encode())
+       # Endpoint errato
+       else:
+           self.send_response(404)
+           self.end_headers()
+           self.wfile.write(json.dumps({"message": "Endpoint non valido"}).encode())
+   # POST
+   def do_POST(self):
+   # Controllo endpoint
+       if self.path == '/products':
+           content_length = int(self.headers['Content-Length'])
+           post_data = self.rfile.read(content_length)
+           new_product = json.loads(post_data)['data']['attributes']
+           new_product_id = Product.post(new_product)
+
+
+           data = {"type": "products", "id": str(new_product_id), "attributes": new_product}
+           self.send_response(201)
+           self.send_header('Content-type', 'application/vnd.api+json')
+           self.send_header('Location', f'http://{self.server.server_address[0]}:{self.server.server_address[1]}/products/{new_product_id}')
+           self.end_headers()
+           self.wfile.write(json.dumps({"data": data}).encode())
+       # Endpoint errato
+       else:
+           self.send_response(404)
+           self.end_headers()
+           self.wfile.write(json.dumps({"message": "Endpoint non valido"}).encode())
+
+
+   # PATCH
+   def do_PATCH(self):
+       if self.path.startswith('/products/'):
+           product_id = self.path.split('/')[-1]
+           content_length = int(self.headers['Content-Length'])
+           patch_data = self.rfile.read(content_length)
+           update_data = json.loads(patch_data)['data']['attributes']
+           updated_product = Product.update(update_data, product_id)
+
+
+           data = {"type": "products", "id": str(product_id), "attributes": {"nome": updated_product[1], "prezzo": updated_product[2], "marca": str(updated_product[3])}}
+           self.send_response(200)
+           self.send_header('Content-type', 'application/vnd.api+json')
+           self.send_header('Location', f'http://{self.server.server_address[0]}:{self.server.server_address[1]}/products/{product_id}')
+           self.end_headers()
+           self.wfile.write(json.dumps({"data": data}).encode())
+       else:
+           self.send_response(404)
+           self.end_headers()
+           self.wfile.write(json.dumps({"message": "Endpoint non valido"}).encode())
+
+
+   # DELETE
+   def do_DELETE(self):
+       if self.path.startswith('/products/'):
+           product_id = self.path.split('/')[-1]
+           existing_product = Product.find(product_id)
+           # Controlla se il prodotto esiste prima di eliminarlo
+           if existing_product:
+               product = Product(existing_product)
+               product.delete()
+               self.send_response(204)
+               self.end_headers()
+           else:
+               self.send_response(404)
+               self.end_headers()
+               self.wfile.write(json.dumps({"message": "Prodotto non trovato"}).encode())
+       # Endpoint errato
+       else:
+           self.send_response(404)
+           self.end_headers()
+           self.wfile.write(json.dumps({"message": "Endpoint non valido"}).encode())
+
+
+def run():
+   server_address = ('', 8888)
+   httpd = HTTPServer(server_address, RequestHandler)
+   print('Server in esecuzione...')
+   httpd.serve_forever()
+
+
+if __name__ == '__main__':
+   run()
